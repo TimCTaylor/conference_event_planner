@@ -4,6 +4,8 @@ import TotalCost from "./TotalCost";
 import { useSelector, useDispatch } from "react-redux";
 import { incrementQuantity, decrementQuantity } from "./venueSlice";
 import { incrementAvQuantity, decrementAvQuantity } from "./avSlice";
+import { toggleMealSelection } from "./mealsSlice";
+
 
 const ConferenceEvent = () => {
   const [showItems, setShowItems] = useState(false);
@@ -45,7 +47,7 @@ const ConferenceEvent = () => {
 
       The store will then use the reducer function defined in venueSlice to determine how to update the state based on the action received.
       */}
-    
+
 
 
   const handleRemoveFromCart = (index) => {
@@ -54,16 +56,25 @@ const ConferenceEvent = () => {
     }
   };
   const handleIncrementAvQuantity = (index) => {
-        dispatch(incrementAvQuantity(index));
+    dispatch(incrementAvQuantity(index));
   };
 
-  const handleDecrementAvQuantity = (index) => {  
-        dispatch(decrementAvQuantity(index));
+  const handleDecrementAvQuantity = (index) => {
+    dispatch(decrementAvQuantity(index));
   };
 
   const handleMealSelection = (index) => {
-
+    const item = mealsItems[index];
+    if (item.selected && item.type === "mealForPeople") {
+      // Ensure numberOfPeople is set before toggling selection
+      const newNumberOfPeople = item.selected ? numberOfPeople : 0;
+      dispatch(toggleMealSelection(index, newNumberOfPeople));
+    }
+    else {
+      dispatch(toggleMealSelection(index));
+    }
   };
+
 
   const getItemsFromTotalCost = () => {
     const items = [];
@@ -73,8 +84,8 @@ const ConferenceEvent = () => {
 
   const ItemsDisplay = ({ items }) => {
   };
- 
- const calculateTotalCost = (section) => {
+
+  const calculateTotalCost = (section) => {
     let totalCost = 0;
     if (section === "venue") {
       venueItems.forEach((item) => {
@@ -84,12 +95,21 @@ const ConferenceEvent = () => {
       avItems.forEach((item) => {
         totalCost += item.cost * item.quantity;
       });
+    } else if (section === "meals") {
+      mealsItems.forEach((item) => {
+        if (item.selected) {
+          totalCost += item.cost * numberOfPeople;
+        }
+      });
     }
     return totalCost;
   };
 
+
   const avTotalCost = calculateTotalCost("av");
   const venueTotalCost = calculateTotalCost("venue");
+  const mealsTotalCost = calculateTotalCost("meals");
+
 
   const navigateToProducts = (idType) => {
     if (idType == '#venue' || idType == '#addons' || idType == '#meals') {
@@ -98,6 +118,8 @@ const ConferenceEvent = () => {
       }
     }
   }
+
+  const mealsItems = useSelector((state) => state.meals);
 
   return (
     <>
@@ -225,20 +247,67 @@ const ConferenceEvent = () => {
                   <h1>Meals Selection</h1>
                 </div>
 
+                {/* Controlled input vs uncontrolled input
+                This is a common React pattern for handling form inputs.
+
+                With controlled inputs, the React state is the single source of truth. We control it at all times.
+                With uncontrolled input, the DOM is the source of truth. We don't know what's in the input box until we read it later. The
+                browser manages the input, which means, amongst other things, that it could be invalid temporarily.
+                We could have done this with an uncontrolled input, which would look something like this:
+                  <input type="number" min="1" />
+                And we would probably read the value and validate it on form submission or button press.
+
+                Here, we are controlling the value through the value prop.
+                When we type in the input box, the onChange event is triggered, which calls the function that updates the state with the new value.
+                Note how with our simple validation logic, we can write the onChange handler inline, rather than split the code up into a separate
+                function.
+
+                NaN - this is a special Javascript value that means Not a Number, and is returned as a value.
+                You always check for it with isNan(), never with a comparison operator (e.g., value === NaN will always return false, even if value is actually NaN). 
+                */}
                 <div className="input-container venue_selection">
+                  <label htmlFor="numberOfPeople"><h3>Number of People:</h3></label>
+                  <input type="number" className="input_box5" id="numberOfPeople" value={numberOfPeople}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value);
 
+                      if (isNaN(value) || value < 1) {
+                        setNumberOfPeople(1);
+                      } else {
+                        setNumberOfPeople(value);
+                      }
+                    }}
+                    min="1"
+                  />
                 </div>
+
                 <div className="meal_selection">
-
+                  {/* Remember - this is a common React pattern. We use map() to iterate over an array (mealsItems). For each item, we call the
+                  provided function to render the JSX. */}
+                  {mealsItems.map((item, index) => (
+                    // Remember that React wants the key prop to keep track of elements in a list. Here, we're using the index as the key, which is generally not recommended for dynamic lists, but is acceptable for static lists that won't change order or have items added/removed. In a real application, it would be better to have a unique identifier for each meal item and use that as the key.
+                    <div className="meal_item" key={index} style={{ padding: 15 }}>
+                      <div className="inner">
+                        <input type="checkbox" id={`meal_${index}`}
+                          checked={item.selected}
+                          onChange={() => handleMealSelection(index)}
+                        />
+                        <label htmlFor={`meal_${index}`}> {item.name} </label>
+                      </div>
+                      <div className="meal_cost">${item.cost}</div>
+                    </div>
+                  ))}
                 </div>
-                <div className="total_cost">Total Cost: </div>
+
+                <div className="total_cost">Total Cost: {mealsTotalCost}</div>
+
 
 
               </div>
             </div>
           ) : (
             <div className="total_amount_detail">
-{/* TODO Commented this next line out as it's not working yet.              
+              {/* TODO Commented this next line out as it's not working yet.              
               <TotalCost totalCosts={totalCosts} handleClick={handleToggleItems} ItemsDisplay={() => <ItemsDisplay items={items} />} /> */}
             </div>
           )
