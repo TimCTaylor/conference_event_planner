@@ -8,12 +8,14 @@ import { toggleMealSelection } from "./mealsSlice";
 
 
 const ConferenceEvent = () => {
+  // Note: I need to use the useSelector hook and other hooks here before I can use them in the functions below. Otherwise, I will get very naughty errors.
   const [showItems, setShowItems] = useState(false);
   const [numberOfPeople, setNumberOfPeople] = useState(1);
   const venueItems = useSelector((state) => state.venue);
   const avItems = useSelector((state) => state.av);
   const dispatch = useDispatch();
-  const remainingAuditoriumQuantity = 3 - venueItems.find(item => item.name === "Auditorium Hall (Capacity:200)").quantity;
+  const mealsItems = useSelector((state) => state.meals);
+  const remainingAuditoriumQuantity = 3 - (venueItems.find(item => item.name === "Auditorium Hall (Capacity:200)")?.quantity ?? 0);
 
 
   const handleToggleItems = () => {
@@ -28,25 +30,24 @@ const ConferenceEvent = () => {
     dispatch(incrementQuantity(index));
   };
 
-  {/* These dispatches seem the most React-Redux part of the code, so let's see if I have this right.
-      Rather than handle the state changes directly in the component, I'm using Redux store to manage state.
-      It's more code and complexity than makes sense for this little app if I were doing it for real, rather than as an exercise.
-      But as we scale up into larger apps, it makes more sense as it means we manage state in a central place and can share it across components more easliy.
-      I can also see how it would lead to nicer separation of concerns, to keep state management separate from the UI code.  
-      
-      Anyway, back to the code:
-      These handler functions are linked to the onClick events of the buttons in the return statement for the ConferenceEvent component. 
-      When a button is clicked, the corresponding handler function is called with the index of the item being modified.
-
-      dispatch is a function provided by the useDispatch hook from React-Redux. It allows us to send actions to the Redux store to update the state.
-
-      decrementQuantity is an action creator imported from the venueSlice. When called with an index, it returns an action object that describes
-      the change we want to make to the state (in this case, decrementing the quantity of a specific venue item).
-      
-      When we call dispatch(decrementQuantity(index)), we're sending that action to the Redux store.
-
-      The store will then use the reducer function defined in venueSlice to determine how to update the state based on the action received.
-      */}
+  // These dispatches seem the most React-Redux part of the code, so let's see if I have this right.
+  // Rather than handle the state changes directly in the component, I'm using Redux store to manage state.
+  // It's more code and complexity than makes sense for this little app if I were doing it for real, rather than as an exercise.
+  // But as we scale up into larger apps, it makes more sense as it means we manage state in a central place and can share it across components more easily.
+  // I can also see how it would lead to nicer separation of concerns, to keep state management separate from the UI code.  
+  //
+  // Anyway, back to the code:
+  // These handler functions are linked to the onClick events of the buttons in the return statement for the ConferenceEvent component. 
+  // When a button is clicked, the corresponding handler function is called with the index of the item being modified.
+  //
+  // dispatch is a function provided by the useDispatch hook from React-Redux. It allows us to send actions to the Redux store to update the state.
+  //
+  // decrementQuantity is an action creator imported from the venueSlice. When called with an index, it returns an action object that describes
+  // the change we want to make to the state (in this case, decrementing the quantity of a specific venue item).
+  //
+  // When we call dispatch(decrementQuantity(index)), we're sending that action to the Redux store.
+  //
+  // The store will then use the reducer function defined in venueSlice to determine how to update the state based on the action received.
 
 
 
@@ -76,14 +77,79 @@ const ConferenceEvent = () => {
   };
 
 
+  // What we're doing here is to create an empty array (items) and then loop through each section of items (venue, av, meals) adding any selected items to the array,
+  //  along with a type property to keep track of which section they belong to.
   const getItemsFromTotalCost = () => {
     const items = [];
+    venueItems.forEach((item) => {
+      if (item.quantity > 0) {
+        items.push({ ...item, type: "venue" });
+      }
+    });
+    avItems.forEach((item) => {
+      if (
+        item.quantity > 0 &&
+        !items.some((i) => i.name === item.name && i.type === "av")
+      ) {
+        items.push({ ...item, type: "av" });
+      }
+    });
+    mealsItems.forEach((item) => {
+      if (item.selected) {
+        const itemForDisplay = { ...item, type: "meals" };
+        if (item.numberOfPeople) {
+          itemForDisplay.numberOfPeople = numberOfPeople;
+        }
+        items.push(itemForDisplay);
+      }
+    });
+    return items;
   };
+
+
 
   const items = getItemsFromTotalCost();
 
+  // Let's remind myself of html tabling.
+  // <thead> is the header section, followed by <tbody>
+  // <tr> is table row and <th> is a header cell, rendered by browsers as bold and centered.
+  // <td> is a standard cell. 
   const ItemsDisplay = ({ items }) => {
+    console.log(items);
+    return <>
+      <div className="display_box1">
+        {items.length === 0 && <p>No items selected</p>}
+        <table className="table_item_data">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Unit Cost</th>
+              <th>Quantity</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => (
+              <tr key={index}>
+                <td>{item.name}</td>
+                <td>${item.cost}</td>
+                <td>
+                  {item.type === "meals" || item.numberOfPeople
+                    ? ` For ${numberOfPeople} people`
+                    : item.quantity}
+                </td>
+                <td>{item.type === "meals" || item.numberOfPeople
+                  ? `${item.cost * numberOfPeople}`
+                  : `${item.cost * item.quantity}`}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   };
+
 
   const calculateTotalCost = (section) => {
     let totalCost = 0;
@@ -112,14 +178,20 @@ const ConferenceEvent = () => {
 
 
   const navigateToProducts = (idType) => {
-    if (idType == '#venue' || idType == '#addons' || idType == '#meals') {
+    if (idType === '#venue' || idType === '#addons' || idType === '#meals') {
       if (showItems) { // Check if showItems is false
         setShowItems(!showItems); // Toggle showItems to true only if it's currently false
       }
     }
   }
 
-  const mealsItems = useSelector((state) => state.meals);
+
+
+  const totalCosts = {
+    venue: venueTotalCost,
+    av: avTotalCost,
+    meals: mealsTotalCost,
+  };
 
   return (
     <>
@@ -217,7 +289,7 @@ const ConferenceEvent = () => {
                       item is the current array element and index its position in the array.
                       I'm using the index as the key for each element, but that is only recommended for static lists.
                       The course recommends I use a unique identifier as part of the element (e.g., item.id) when
-                      list order can change. In Rect terms, React likes the items it renders to have a stable key prop.*/}
+                      list order can change. In React terms, React likes the items it renders to have a stable key prop.*/}
                   {avItems.map((item, index) => (
                     <div className="av_data venue_main" key={index}>
                       <div className="img">
@@ -307,8 +379,8 @@ const ConferenceEvent = () => {
             </div>
           ) : (
             <div className="total_amount_detail">
-              {/* TODO Commented this next line out as it's not working yet.              
-              <TotalCost totalCosts={totalCosts} handleClick={handleToggleItems} ItemsDisplay={() => <ItemsDisplay items={items} />} /> */}
+
+              <TotalCost totalCosts={totalCosts} handleClick={handleToggleItems} ItemsDisplay={() => <ItemsDisplay items={items} />} />
             </div>
           )
         }
